@@ -16,11 +16,19 @@ async function run() {
     try {
         await client.connect();
         const toolCollection = client.db('craftsman_solution').collection('tools');
+        const orderCollection = client.db('craftsman_solution').collection('orders');
+
         app.get('/tool', async (req, res) => {
             const query = {};
             const cursor = toolCollection.find(query);
             const tools = await cursor.toArray();
             res.send(tools);
+        });
+
+        app.post('/order', async (req, res) => {
+            const order = req.body;
+            const result = await orderCollection.insertOne(order);
+            res.send(result);
         })
     }
     finally {
