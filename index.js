@@ -17,6 +17,7 @@ async function run() {
         await client.connect();
         const toolCollection = client.db('craftsman_solution').collection('tools');
         const orderCollection = client.db('craftsman_solution').collection('orders');
+        const userCollection = client.db('craftsman_solution').collection('users');
 
         app.get('/tool', async (req, res) => {
             const query = {};
@@ -25,18 +26,30 @@ async function run() {
             res.send(tools);
         });
 
+        app.put('/user/:BuyerEmail', async (req, res) => {
+            const BuyerEmail = req.params.BuyerEmail;
+            const user = req.body;
+            const filter = { BuyerEmail: BuyerEmail };
+            const options = { upsert: true };
+            const updatedDoc = {
+                $set: user,
+            };
+            const result = await userCollection.updateOne(filter, updatedDoc, options);
+            res.send(result);
+        });
+
         app.get('/order', async (req, res) => {
             const BuyerEmail = req.query.BuyerEmail
             const query = { BuyerEmail: BuyerEmail }
             const orders = await orderCollection.find(query).toArray();
             res.send(orders);
-        })
+        });
 
         app.post('/order', async (req, res) => {
             const order = req.body;
             const result = await orderCollection.insertOne(order);
             res.send(result);
-        })
+        });
     }
     finally {
 
