@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const app = express();
@@ -11,6 +12,21 @@ app.use(express.json());
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ghq7u.mongodb.net/?retryWrites=true&w=majority`;
 
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+
+function verifyJWT(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        return res.status(401).send({ message: 'UnAuthorized access' })
+    }
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+        if (err) {
+            return res.status(403).send({ message: 'Forbidden access' })
+        }
+        req.decoded = decoded;
+        next();
+    });
+}
 
 async function run() {
     try {
@@ -26,6 +42,28 @@ async function run() {
             res.send(tools);
         });
 
+        app.get('/user', async (req, res) => {
+            const users = await userCollection.find().toArray();
+            res.send(users);
+        });
+
+        app.get('/admin/:BuyerEmail', async (req, res) => {
+            const BuyerEmail = req.params.BuyerEmail;
+            const user = await userCollection.findOne({ BuyerEmail: BuyerEmail });
+            const isAdmin = user.role === 'admin';
+            res.send({ admin: isAdmin })
+        })
+
+        app.put('/user/admin/:BuyerEmail', async (req, res) => {
+            const BuyerEmail = req.params.BuyerEmail;
+            const filter = { BuyerEmail: BuyerEmail };
+            const updatedDoc = {
+                $set: { role: 'admin' },
+            };
+            const result = await userCollection.updateOne(filter, updatedDoc);
+            res.send(result);
+        });
+
         app.put('/user/:BuyerEmail', async (req, res) => {
             const BuyerEmail = req.params.BuyerEmail;
             const user = req.body;
@@ -35,12 +73,16 @@ async function run() {
                 $set: user,
             };
             const result = await userCollection.updateOne(filter, updatedDoc, options);
-            res.send(result);
+            const token = jwt.sign({ BuyerEmail: BuyerEmail },
+                process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+            res.send({ result, token });
         });
 
-        app.get('/order', async (req, res) => {
-            const BuyerEmail = req.query.BuyerEmail
-            const query = { BuyerEmail: BuyerEmail }
+        app.get('/order', verifyJWT, async (req, res) => {
+            const BuyerEmail = req.query.BuyerEmail;
+            const authorization = req.headers.authorization;
+            console.log('auth header', authorization);
+            const query = { BuyerEmail: BuyerEmail };
             const orders = await orderCollection.find(query).toArray();
             res.send(orders);
         });
