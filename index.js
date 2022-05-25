@@ -42,6 +42,12 @@ async function run() {
             res.send(tools);
         });
 
+        app.post('/tool', async (req, res) => {
+            const newItem = req.body;
+            const result = await toolCollection.insertOne(newItem);
+            res.send(result);
+        })
+
         app.get('/user', async (req, res) => {
             const users = await userCollection.find().toArray();
             res.send(users);
@@ -52,16 +58,24 @@ async function run() {
             const user = await userCollection.findOne({ BuyerEmail: BuyerEmail });
             const isAdmin = user.role === 'admin';
             res.send({ admin: isAdmin })
-        })
+        });
 
-        app.put('/user/admin/:BuyerEmail', async (req, res) => {
+        app.put('/user/admin/:BuyerEmail', verifyJWT, async (req, res) => {
             const BuyerEmail = req.params.BuyerEmail;
-            const filter = { BuyerEmail: BuyerEmail };
-            const updatedDoc = {
-                $set: { role: 'admin' },
-            };
-            const result = await userCollection.updateOne(filter, updatedDoc);
-            res.send(result);
+            const requester = req.decoded.BuyerEmail;
+            const requesterAccount = await userCollection.findOne({ BuyerEmail: requester });
+            if (requesterAccount.role === 'admin') {
+                const filter = { BuyerEmail: BuyerEmail };
+                const updatedDoc = {
+                    $set: { role: 'admin' },
+                };
+                const result = await userCollection.updateOne(filter, updatedDoc);
+                res.send(result);
+            }
+            else {
+                res.status(403).send({ message: 'forbidden' })
+            }
+
         });
 
         app.put('/user/:BuyerEmail', async (req, res) => {
@@ -78,10 +92,10 @@ async function run() {
             res.send({ result, token });
         });
 
-        app.get('/order', verifyJWT, async (req, res) => {
+        app.get('/order', async (req, res) => {
             const BuyerEmail = req.query.BuyerEmail;
             const authorization = req.headers.authorization;
-            console.log('auth header', authorization);
+            // console.log('auth header', authorization);
             const query = { BuyerEmail: BuyerEmail };
             const orders = await orderCollection.find(query).toArray();
             res.send(orders);
