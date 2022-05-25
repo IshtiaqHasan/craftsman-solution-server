@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectID } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000
 
@@ -93,6 +93,14 @@ async function run() {
         });
 
         app.get('/order', async (req, res) => {
+            const query = {};
+            const cursor = orderCollection.find(query);
+            const orders = await cursor.toArray();
+            res.send(orders);
+        });
+
+
+        app.get('/order', verifyJWT, async (req, res) => {
             const BuyerEmail = req.query.BuyerEmail;
             const authorization = req.headers.authorization;
             // console.log('auth header', authorization);
@@ -106,6 +114,13 @@ async function run() {
             const result = await orderCollection.insertOne(order);
             res.send(result);
         });
+
+        app.delete('/order/:itemId', async (req, res) => {
+            const itemId = req.params.itemId;
+            const query = { _id: ObjectID(itemId) };
+            const result = await orderCollection.deleteOne(query);
+            res.send(result);
+        })
     }
     finally {
 
